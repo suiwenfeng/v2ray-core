@@ -1,13 +1,14 @@
 package shadowsocks
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	net "github.com/v2fly/v2ray-core/v5/common/net"
 	packetaddr "github.com/v2fly/v2ray-core/v5/common/net/packetaddr"
 	protocol "github.com/v2fly/v2ray-core/v5/common/protocol"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -25,6 +26,8 @@ const (
 	CipherType_AES_256_GCM       CipherType = 2
 	CipherType_CHACHA20_POLY1305 CipherType = 3
 	CipherType_NONE              CipherType = 4
+	CipherType_AES_128_CFB       CipherType = 5
+	CipherType_AES_256_CFB       CipherType = 6
 )
 
 // Enum value maps for CipherType.

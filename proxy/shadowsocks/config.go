@@ -63,6 +63,10 @@ func createChaCha20Poly1305(key []byte) cipher.AEAD {
 
 func (a *Account) getCipher() (Cipher, error) {
 	switch a.CipherType {
+	case CipherType_AES_128_CFB:
+		return &AesCfb{KeyBytes: 16}, nil
+	case CipherType_AES_256_CFB:
+		return &AesCfb{KeyBytes: 32}, nil
 	case CipherType_AES_128_GCM:
 		return &AEADCipher{
 			KeyBytes:        16,
@@ -116,6 +120,53 @@ type Cipher interface {
 	IsAEAD() bool
 	EncodePacket(key []byte, b *buf.Buffer) error
 	DecodePacket(key []byte, b *buf.Buffer) error
+}
+
+// AesCfb represents all AES-CFB ciphers.
+type AesCfb struct {
+	KeyBytes int32
+}
+
+func (*AesCfb) IsAEAD() bool {
+	return false
+}
+
+func (v *AesCfb) KeySize() int32 {
+	return v.KeyBytes
+}
+
+func (v *AesCfb) IVSize() int32 {
+	return 16
+}
+
+func (v *AesCfb) NewEncryptionWriter(key []byte, iv []byte, writer io.Writer) (buf.Writer, error) {
+	stream := crypto.NewAesEncryptionStream(key, iv)
+	return &buf.SequentialWriter{Writer: crypto.NewCryptionWriter(stream, writer)}, nil
+}
+
+func (v *AesCfb) NewDecryptionReader(key []byte, iv []byte, reader io.Reader) (buf.Reader, error) {
+	stream := crypto.NewAesDecryptionStream(key, iv)
+	return &buf.SingleReader{
+		Reader: crypto.NewCryptionReader(stream, reader),
+	}, nil
+}
+
+func (v *AesCfb) EncodePacket(key []byte, b *buf.Buffer) error {
+	iv := b.BytesTo(v.IVSize())
+	stream := crypto.NewAesEncryptionStream(key, iv)
+	stream.XORKeyStream(b.BytesFrom(v.IVSize()), b.BytesFrom(v.IVSize()))
+	return nil
+}
+
+func (v *AesCfb) DecodePacket(key []byte, b *buf.Buffer) error {
+	if b.Len() <= v.IVSize() {
+		return newError("insufficient data: ", b.Len())
+	}
+	iv := b.BytesTo(v.IVSize())
+	stream := crypto.NewAesDecryptionStream(key, iv)
+	stream.XORKeyStream(b.BytesFrom(v.IVSize()), b.BytesFrom(v.IVSize()))
+	b.Advance(v.IVSize())
+	return nil
 }
 
 type AEADCipher struct {
@@ -212,6 +263,10 @@ func (NoneCipher) DecodePacket(key []byte, b *buf.Buffer) error {
 
 func CipherFromString(c string) CipherType {
 	switch strings.ToLower(c) {
+	case "aes-128-cfb":
+		return CipherType_AES_128_CFB
+	case "aes-256-cfb":
+		return CipherType_AES_256_CFB
 	case "aes-128-gcm", "aes_128_gcm", "aead_aes_128_gcm":
 		return CipherType_AES_128_GCM
 	case "aes-256-gcm", "aes_256_gcm", "aead_aes_256_gcm":
